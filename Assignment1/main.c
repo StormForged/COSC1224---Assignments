@@ -118,20 +118,28 @@ void checkForGLerrors(int lineno){
         printf("%d: %s\n", lineno, gluErrorString(error));
 } 
 
+void init(void){
+    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glEnable(GL_DEPTH_TEST);
+    buildVertexBufferObjects();
+}
+
 void enableClientState(){
-    
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_NORMAL_ARRAY);
 }
 
 void disableClientState(){
-    
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_NORMAL_ARRAY);
 }
 
 void enableVertexArrays(){
-    glEnableClientState(GL_VERTEX_ARRAY);
+    enableClientState();
 }
 
 void disableVertexArrays(){
-    glDisableClientState(GL_VERTEX_ARRAY);
+    enableClientState();
 }
 
 void bindVertexBufferObjects(){
@@ -147,23 +155,22 @@ void unbindVertexBufferObjects(){
 }
 
 void enableVertexBufferObjects(){
+    enableClientState();
     bindVertexBufferObjects();
 }
 
 void disableVertexBufferObjects(){
+    disableClientState();
     unbindVertexBufferObjects();
 }
 
 void bufferData(){
-
+    bindVertexBufferObjects();
 }
-
 
 void buildVertexBufferObjects(){
     glGenBuffers(1, &vbo);
     glGenBuffers(1, &ibo);
-
-    bindVertexBufferObjects();
 }
 
 void reshape(int w, int h){
@@ -250,6 +257,14 @@ void displayOSD(){
     glPushMatrix();
     glLoadIdentity();
     glViewport(0, 0, w, h);
+
+    //Render mode (numeric)
+    glColor3f(1.0, 1.0, 0.0);
+    glRasterPos2i(10, 80);
+    snprintf(buffer, sizeof buffer, "rendermode: %s", renderModeName[g.renderMode]);
+    for(bufp = buffer; *bufp; bufp++)
+    glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
+
 
     //Frame rate
     glColor3f(1.0, 1.0, 0.0);
@@ -383,7 +398,7 @@ void computeAndStoreSineWaveSum(sinewave sws[], int nsw, int tess, bool tessChan
     indices = (unsigned *)malloc(n_indices * sizeof(unsigned));
 
     //Vertices
-    float stepSize = 2.0 / tess;
+    float stepSize = 2.0 / (float)tess;
     vec3f r, n;
     float t = g.t;
     Vertex *vtx = vertices;
@@ -393,6 +408,7 @@ void computeAndStoreSineWaveSum(sinewave sws[], int nsw, int tess, bool tessChan
             r.z = -1.0 + j * stepSize;
             calcSineWaveSum(sws, nsw, r.x, r.z, t, &r.y, g.lighting ? true : false, &n.x, &n.z);
             vtx->r = (vec3f) { r.x, r.y, r.z};
+            vtx->n = (vec3f) { n.x, n.y, n.z};
             vtx++;
         }
     }
@@ -409,12 +425,12 @@ void computeAndStoreSineWaveSum(sinewave sws[], int nsw, int tess, bool tessChan
 
 //Update vertex coordinates and normals in array
 void updateStoredArraySineWave(sinewave sws[], int nsw){
-
+    computeAndStoreSineWaveSum(sws, nsw, g.tess, false);
 }
 
 //Update vertex coordinates in buffer
 void updateBufferDataSineWave(sinewave sws[], int nsw){
-
+    computeAndStoreSineWaveSum(sws, nsw, g.tess, false);
 }
 
 //Draw a sinewave using stored vertex coordinates and normals
@@ -451,7 +467,7 @@ void drawSineWaveStoredVerticesAndIndices(int tess){
     for(int i = 0; i < tess; i++){
         glBegin(GL_TRIANGLE_STRIP);
         for(int j = 0; j <= tess; j++){
-            int idx = i * (tess * 2) + j;
+            int idx = i * ((tess + 1) * 2) + j;
 
             glArrayElement(indices[idx]);
 
@@ -469,6 +485,7 @@ void drawSineWaveVertexArraysDrawElements(int tess){
     glPushAttrib(GL_CURRENT_BIT);
     glColor3f(1.0, 1.0, 1.0);
     glVertexPointer(3, GL_FLOAT, sizeof(Vertex), vertices);
+    glNormalPointer(GL_FLOAT, sizeof(Vertex), vertices);
     //
     for (int i = 0; i < tess; i++){
         glDrawElements(GL_TRIANGLE_STRIP, (tess + 1) * 2, GL_UNSIGNED_INT, &indices[i * (tess + 1) * 2]);
@@ -484,14 +501,13 @@ void drawSineWaveVertexArrays(int tess){
 
 void drawSineWaveVertexBufferObjectsDrawElements(int tess){
     glPushAttrib(GL_CURRENT_BIT);
-    glColor3f(1.0, 0.0, 0.0);
+    glColor3f(1.0, 1.0, 1.0);
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
 
     glVertexPointer(3, GL_FLOAT, sizeof(Vertex), BUFFER_OFFSET(0));
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
 
-    //
     for(int i = 0; i < tess; i++){
         glDrawElements(GL_TRIANGLE_STRIP, (tess + 1) * 2, GL_UNSIGNED_INT, BUFFER_OFFSET((i * (tess + 1) * 2) * sizeof(unsigned int)));
     }
@@ -631,13 +647,6 @@ void displayMultiView(){
     checkForGLerrors(__LINE__);
 
     g.frameCount++;
-}
-
-void init(void){
-    glClearColor(0.0, 0.0, 0.0, 1.0);
-    glEnable(GL_DEPTH_TEST);
-    buildVertexBufferObjects();
-    unbindVertexBufferObjects();
 }
 
 void display(){
@@ -816,7 +825,7 @@ void motion(int x, int y){
 int main(int argc, char** argv){
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
-    glutInitWindowSize(400,400);
+    glutInitWindowSize(1920,1080);
     glutInitWindowPosition(100,100);
     glutCreateWindow(argv[0]);
     init();
