@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
+#include <SDL2/SDL.h>
 
 #define GL_GLEXT_PROTOTYPES
 #include <GL/glut.h>
@@ -68,9 +69,12 @@ typedef struct{
     bool displayOSD;
     bool consolePM;
     RenderMode renderMode;
+    bool multidisplay;
 } Global;
 
-Global g = { false, 0.0, 0.0, line, false, false, 0, 0, 8, 2, 0, 0.0, 1.0, 0, false, false, immediate };
+Global g = { false, 0.0, 0.0, line, false, false, 0, 0, 8, 2, 0, 0.0, 1.0, 0, false, false, immediate, false };
+
+SDL_Window *window;
 
 char *renderModeName[] = {
     "IM",
@@ -105,6 +109,19 @@ unsigned vbo, ibo;
 void computeAndStoreSineWaveSum(sinewave sws[], int nsw, int tess, bool tessChange);
 
 void buildVertexBufferObjects();
+
+int wantRedisplay = 1;
+void postRedisplay()
+{
+  wantRedisplay = 1;
+}
+
+void quit(int code)
+{
+  SDL_DestroyWindow(window);
+  SDL_Quit();
+  exit(code);
+}
 
 void panic(char *s){
     fprintf(stderr, "%s\n", s);
@@ -249,8 +266,11 @@ void displayOSD(){
 
     //Set up orthographic coordinate system to match the window,
     //ie. (0,0)-(w,h)
-    w = glutGet(GLUT_WINDOW_WIDTH);
-    h = glutGet(GLUT_WINDOW_HEIGHT);
+
+    //Hard coded, sorry
+    w = 1920;
+    h = 1080;
+
     glOrtho(0.0, w, 0.0, h, -1.0, 1.0);
     
     glMatrixMode(GL_MODELVIEW);
@@ -263,7 +283,7 @@ void displayOSD(){
     glRasterPos2i(10, 80);
     snprintf(buffer, sizeof buffer, "rendermode: %s", renderModeName[g.renderMode]);
     for(bufp = buffer; *bufp; bufp++)
-    glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
+        glutBitmapCharacter(GLUT_BITMAP_9_BY_15, *bufp);
 
 
     //Frame rate
@@ -402,7 +422,7 @@ void computeAndStoreSineWaveSum(sinewave sws[], int nsw, int tess, bool tessChan
     vec3f r, n;
     float t = g.t;
     Vertex *vtx = vertices;
-    for(int i = 0; i < tess; i++){
+    for(int i = 0; i <= tess; i++){
         for(int j = 0; j <= tess; j++){
             r.x = -1.0 + i * stepSize;
             r.z = -1.0 + j * stepSize;
@@ -445,10 +465,12 @@ void drawSineWaveStoredVertices(int tess){
         for(int j = 0; j <= tess; j++){
             int idx = i * (tess + 1) + j;
 
+            glNormal3fv(&vertices[idx].n.x);
             glVertex3fv(&vertices[idx].r.x);
             
             idx += tess + 1;
 
+            glNormal3fv(&vertices[idx].n.x);
             glVertex3fv(&vertices[idx].r.x);
         }
         glEnd();
@@ -597,7 +619,7 @@ void idle(){
         g.frameCount = 0;
     }
 
-    glutPostRedisplay();
+    postRedisplay();
 }
 
 void displayMultiView(){
@@ -643,7 +665,7 @@ void displayMultiView(){
     if(g.consolePM)
         consolePM();
 
-    glutSwapBuffers();
+    SDL_GL_SwapWindow(window);
     checkForGLerrors(__LINE__);
 
     g.frameCount++;
@@ -673,84 +695,72 @@ void display(){
     if(g.consolePM)
         consolePM();
 
-    glutSwapBuffers();
+    SDL_GL_SwapWindow(window);
 
     checkForGLerrors(__LINE__);
 
     g.frameCount++;
 }
 
-void keyboard(unsigned char key, int x, int y){
-    switch(key){
-        case 27:
-            printf("exit\n");
-            exit(0);
+//Key down events
+void keyDown(SDL_KeyboardEvent *e){
+    switch(e->keysym.sym){
+        case SDLK_ESCAPE:
+            quit(0);
             break;
-        case 'a':
+        case SDLK_a:
             g.animate = !g.animate;
             break;
-        case 'l':
+        case SDLK_l:
             g.lighting = !g.lighting;
-            glutPostRedisplay();
+            postRedisplay();
             break;
-        case 'm':
-            printf("%d\n", g.polygonMode);
+        case SDLK_m:
             if(g.polygonMode == line)
                 g.polygonMode = fill;
             else
                 g.polygonMode = line;
-            glutPostRedisplay();
+            postRedisplay();
             break;
-        case 'n':
+        case SDLK_n:
             g.drawNormals = !g.drawNormals;
-            glutPostRedisplay();
+            postRedisplay();
             break;
-        case 'c':
+        case SDLK_c:
             g.consolePM = !g.consolePM;
-            glutPostRedisplay();
+            postRedisplay();
             break;
-        case 'o':
+        case SDLK_o:
             g.displayOSD = !g.displayOSD;
-            glutPostRedisplay();
+            postRedisplay();
             break;
-        case 's':
-            glutDisplayFunc(display);
-            glutPostRedisplay();
+        case SDLK_s:
+            g.multidisplay = !g.multidisplay;
+            postRedisplay();
             break;
-        case 'S':
-            glutDisplayFunc(displayMultiView);
-            glutPostRedisplay();
-            break;
-        case '+':
+        case SDLK_KP_PLUS:
             g.tess *= 2;
             computeAndStoreSineWaveSum(sws, nsw, g.tess, true);
             if(g.renderMode == vertexBufferObjects)
                 bufferData();
-            glutPostRedisplay();
+            postRedisplay();
             break;
-        case '-':
+        case SDLK_KP_MINUS:
             g.tess /= 2;
             if(g.tess < 8)
                 g.tess = 8;
             computeAndStoreSineWaveSum(sws, nsw, g.tess, true);
             if(g.renderMode == vertexBufferObjects)
                 bufferData();
-            glutPostRedisplay();
+            postRedisplay();
             break;
-        case 'd':
+        case SDLK_d:
             g.waveDim++;
             if(g.waveDim >3)
                 g.waveDim = 2;
-            glutPostRedisplay();
+            postRedisplay();
             break;
-        default:
-            break;
-    }
-}
-
-void keyboardSpecial(int key, int x, int y){
-    switch(key){
-        case GLUT_KEY_F1:
+        case SDLK_F1:
             g.renderMode++;
             if(g.renderMode >= lastRenderMode)
                 g.renderMode = 0;
@@ -761,81 +771,190 @@ void keyboardSpecial(int key, int x, int y){
             //Due to animation
             if(g.renderMode == vertexBufferObjects)
                 bufferData();
-            glutPostRedisplay();
+            postRedisplay();
             break;
         default:
             break;
     }
 }
 
-void mouse(int button, int state, int x, int y){
-    if(debug[d_mouse])
-        printf("mouse: %d %d %d\n", button, x, y);
-    
-    camera.lastX = x;
-    camera.lastY = y;
+//Key up events
+void keyUp(SDL_KeyboardEvent *e){
 
-    if(state == GLUT_DOWN)
-        switch(button){
-            case GLUT_LEFT_BUTTON:
-                camera.control = rotate;
-                break;
-            case GLUT_MIDDLE_BUTTON:
-                camera.control = pan;
-                break;
-            case GLUT_RIGHT_BUTTON:
-                camera.control = zoom;
-                break;
-        }
-    else if (state == GLUT_UP)
-        camera.control = inactive;
 }
 
-void motion(int x, int y){
+void eventDispatcher(){
+    SDL_Event e;
     float dx, dy;
 
-    if(debug[d_mouse]){
-        printf("motion: %d %d\n", x, y);
-        printf("camera.rotate: %f %f\n", camera.rotateX, camera.rotateY);
-        printf("camera.scale: %f\n", camera.scale);
+    //Handle events
+    while(SDL_PollEvent(&e)){
+        switch(e.type){
+            case SDL_QUIT:
+                quit(0);
+                break;
+            case SDL_MOUSEMOTION:
+                dx = e.motion.x - camera.lastX;
+                dy = e.motion.y - camera.lastY;
+                camera.lastX = e.motion.x;
+                camera.lastY = e.motion.y;
+
+                switch(camera.control){
+                    case inactive:
+                        break;
+                    case rotate:
+                        camera.rotateX += dy;
+                        camera.rotateY += dx;
+                        break;
+                    case pan:
+                        break;
+                    case zoom:
+                        camera.scale += dy / 100.0;
+                        break;
+                }
+                postRedisplay();
+                break;
+            case SDL_MOUSEBUTTONDOWN:
+                switch(e.button.button){
+                    case SDL_BUTTON_LEFT:
+                        camera.control = rotate;
+                        break; 
+                    case SDL_BUTTON_MIDDLE:
+                        camera.control = pan;
+                        break;
+                    case SDL_BUTTON_RIGHT:
+                        camera.control = zoom;
+                        break;
+                    default:
+                        break;    
+                }
+                break;
+            case SDL_MOUSEBUTTONUP:
+                camera.control = inactive;
+                break;
+            case SDL_KEYDOWN:
+                keyDown(&e.key);
+                break;
+            case SDL_WINDOWEVENT:
+                switch(e.window.event){
+                    case SDL_WINDOWEVENT_SHOWN:
+                        break;
+                    case SDL_WINDOWEVENT_SIZE_CHANGED:
+                        break;
+                    case SDL_WINDOWEVENT_RESIZED:
+                        if(e.window.windowID == SDL_GetWindowID(window)){
+                            SDL_SetWindowSize(window, e.window.data1, e.window.data2);
+                            reshape(e.window.data1, e.window.data2);
+                            postRedisplay();
+                        }
+                        break;
+                    case SDL_WINDOWEVENT_CLOSE:
+                        break;
+                    default:
+                        break;
+                }
+            default:
+                break;
+        }
+    }
+}
+
+void update(){
+    float t, dt;
+
+    t = SDL_GetTicks() / milli;
+
+    //Accumulate time if animation enabled
+    if(g.animate){
+        dt = t - g.lastT;
+        g.t += dt;
+        if(debug[d_animation])
+            printf("idle: animate %f\n", g.t);
     }
 
-    dx = x - camera.lastX;
-    dy = y - camera.lastY;
-    camera.lastX = x;
-    camera.lastY = y;
+    g.lastT = t;
 
-    switch(camera.control){
-        case inactive:
-            break;
-        case rotate:
-            camera.rotateX += dy;
-            camera.rotateY += dx;
-            break;
-        case pan:
-            break;
-        case zoom:
-            camera.scale += dy / 100.0;
-            break;
+    //Update stats, although could make conditional on a flag set interactively
+    dt = (t - g.lastStatsDisplayT);
+    if(dt > g.displayStatsInterval){
+        g.frameRate = g.frameCount / dt;
+        if(debug[d_OSD])
+            printf("dt %f framecount %d framerate %f\n", dt, g.frameCount, g.frameRate);
+        g.lastStatsDisplayT = t;
+        g.frameCount = 0;
     }
 
-    glutPostRedisplay();
+    postRedisplay();
+}
+
+void mainLoop(){
+    while(1){
+        eventDispatcher();
+        if(!g.multidisplay)
+            display();
+        else
+            displayMultiView();
+        update();
+    }
+}
+
+int initGraphics(){
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    
+    window = 
+        SDL_CreateWindow("Graphics Benchmarking", 
+            SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+            1920, 1080, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    if(!window){
+        fprintf(stderr, "%s:%d: create window failed: %s\n",
+            __FILE__, __LINE__, SDL_GetError());
+        exit(EXIT_FAILURE);
+    }
+
+    SDL_GLContext mainGLContext = SDL_GL_CreateContext(window);
+    if(mainGLContext == 0){
+        fprintf(stderr, "%s:%d: create context failed: %s\n",
+            __FILE__, __LINE__, SDL_GetError());
+        exit(EXIT_FAILURE);
+    }
+
+    int w, h;
+    SDL_GetWindowSize(window, &w, &h);
+    reshape(w, h);
+
+    return 0;
+}
+
+void sys_shutdown(){
+    SDL_Quit();
 }
 
 int main(int argc, char** argv){
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
-    glutInitWindowSize(1920,1080);
-    glutInitWindowPosition(100,100);
-    glutCreateWindow(argv[0]);
+    if(SDL_Init(SDL_INIT_VIDEO) < 0){
+        fprintf(stderr, "%s:%d: unable to init SDL: %s\n",
+            __FILE__, __LINE__, SDL_GetError());
+        exit(EXIT_FAILURE);
+    }
+
+    //Set up the window and OpenGL rendering context
+    if(initGraphics()){
+        SDL_Quit();
+        return EXIT_FAILURE;
+    }
+
+    //OpenGL initiialisation, must be done before any OpenGL calls
     init();
-    glutDisplayFunc(display);
-    glutReshapeFunc(reshape);
-    glutIdleFunc(idle);
-    glutKeyboardFunc(keyboard);
-    glutSpecialFunc(keyboardSpecial);
-    glutMouseFunc(mouse);
-    glutMotionFunc(motion);
-    glutMainLoop();
-    return 0;
+
+    atexit(sys_shutdown);
+
+    //Glut init called for the sake of OSD
+    glutInit(&argc, argv);
+
+    mainLoop();
+
+    return EXIT_SUCCESS;
 }
