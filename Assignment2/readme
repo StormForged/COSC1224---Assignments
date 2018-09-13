@@ -2,3 +2,6 @@
 - Shader does not work in CPU mode
 - CPU lighting is slightly darker than fixed lighting
 - Fixed shader is darker than fixed lighting
+
+-- COMPILER STUFF BECAUSE IM DUMB AND MY MAKEFILES NEVER WORK --
+gcc -g -o assignment sinewave3D-glm.cpp shaders.c -lglut -lGLU -lGL -lm -lSDL2
