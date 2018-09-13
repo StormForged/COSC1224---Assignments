@@ -1,0 +1,4 @@
+- Shader vs not shader lighting looks different at lower tesselations
+- Shader does not work in CPU mode
+- CPU lighting is slightly darker than fixed lighting
+- Fixed shader is darker than fixed lighting
