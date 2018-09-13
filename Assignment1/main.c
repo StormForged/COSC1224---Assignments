@@ -593,35 +593,6 @@ void drawSineWave(sinewave sw[], int nsw, int tess){
     glPopAttrib();
 }
 
-
-void idle(){
-    float t, dt;
-
-    t = glutGet(GLUT_ELAPSED_TIME) / milli;
-
-    //Accumulate time if animation enabled
-    if(g.animate){
-        dt = t - g.lastT;
-        g.t += dt;
-        if(debug[d_animation])
-            printf("idle: animate %f\n", g.t);
-    }
-
-    g.lastT = t;
-
-    //Update stats, although could make conditional on a flag set interactively
-    dt = (t - g.lastStatsDisplayT);
-    if(dt > g.displayStatsInterval){
-        g.frameRate = g.frameCount / dt;
-        if(debug[d_OSD])
-            printf("dt %f framecount %d framerate %f\n", dt, g.frameCount, g.frameRate);
-        g.lastStatsDisplayT = t;
-        g.frameCount = 0;
-    }
-
-    postRedisplay();
-}
-
 void displayMultiView(){
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glMatrixMode(GL_MODELVIEW);
