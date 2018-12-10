@@ -1,0 +1,14 @@
+Curtis Maunder s3488211
+
+--- IMPLEMENTED FEATURES -- 
+- Rectangular arena where motes collide elastically with wall, but inelastically with other motes
+- Ability to zoom in/out || controlled with mout and o/l
+- Player controller mote is controlled by ejecting mass || This works in four directions controlled with wasd
+- Implement one level where the aim is to grow the player 'mote' to be the largest
+- Use simple plain colours for rendering motes
+- Use brute force collision
+- Shader is used to somewhat render the mote/it's used to colour it
+- Absorbtion isnt instant
+
+-- NOTE -- 
+Memory management is gross but functional
